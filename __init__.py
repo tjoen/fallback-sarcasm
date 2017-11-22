@@ -1,19 +1,19 @@
-# Copyright 2017 Mycroft AI, Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# High pitched voiced fallbackskill
+# Add more sarcasm to your Mycroft
+# Install prereq picotts with 'sudo apt-get libttspico-utils' first
 
 from mycroft.skills.core import FallbackSkill
+from mycroft.util.log import getLogger
+import tempfile
+import subprocess
+import os
 
+__author__ = 'tjoen'
+
+LOGGER = getLogger(__name__)
+
+DEFAULT_TEXT = "<volume level='50'><pitch level='200'>"
+DEFAULT_LANGUAGE = 'en-GB'
 
 class UnknownSkill(FallbackSkill):
     def __init__(self):
@@ -22,8 +22,30 @@ class UnknownSkill(FallbackSkill):
     def initialize(self):
         self.register_fallback(self.handle_fallback, 100)
 
+    def say(self,text,lang):
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
+            fname = f.name
+        cmd = ['pico2wave', '--wave', fname]
+        cmd.extend(['-l', lang])
+        cmd.append(text)
+        with tempfile.TemporaryFile() as f:
+            subprocess.call(cmd, stdout=f, stderr=f)
+            f.seek(0)
+            output = f.read()
+        self.play(fname)
+        os.remove(fname)
+
+    def play(self,filename):
+        cmd = ['aplay', str(filename)]
+        with tempfile.TemporaryFile() as f:
+            subprocess.call(cmd, stdout=f, stderr=f)
+            f.seek(0)
+            output = f.read()
+
     def handle_fallback(self, message):
-        self.speak_dialog('unknown')
+        txt = message.data.get("utterance")
+        LOGGER.debug("The message data is: {}".format(message.data))
+        self.say(DEFAULT_TEXT + txt,DEFAULT_LANGUAGE)
         return True
 
 
