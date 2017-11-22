@@ -15,9 +15,9 @@ LOGGER = getLogger(__name__)
 DEFAULT_TEXT = "<volume level='50'><pitch level='200'>"
 DEFAULT_LANGUAGE = 'en-GB'
 
-class UnknownSkill(FallbackSkill):
+class SarcasmSkill(FallbackSkill):
     def __init__(self):
-        super(UnknownSkill, self).__init__()
+        super(SarcasmSkill, self).__init__()
 
     def initialize(self):
         self.register_fallback(self.handle_fallback, 100)
