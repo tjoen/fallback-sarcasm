@@ -1,11 +1,12 @@
-## Unknown Fallback
+## sarcasm-fallbackskill
 Fallback for when Mycroft doesn't know the answer
 
 ## Description 
-When you ask Mycroft something that no skill can answer, this is the final skill it goes to.
+ 
+Add more sarcasm to your Mycroft now!
+Repeat the utterance with a high pitched voice
+
+- Install prereq picotts with 'sudo apt-get libttspico-utils' first.
 
 ## Examples 
 * "Hey Mycroft, blah blah blah"
-
-## Credits 
-Mycroft AI
