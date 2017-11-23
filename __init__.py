@@ -50,4 +50,4 @@ class SarcasmSkill(FallbackSkill):
 
 
 def create_skill():
-    return UnknownSkill()
+    return SarcasmSkill()
