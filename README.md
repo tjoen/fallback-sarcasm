@@ -20,4 +20,4 @@ But it actually works a lot better with non-existing evil skills
 * "Hey Mycroft, destroy the death star"
 * "Hey Mycroft, engage warp engines and start an attack"
 * "Hey Mycroft, invade england"
-* "Hey Mycroft, Hack my neighbours wifi"
+* "Hey Mycroft, hack my neighbours wifi"
