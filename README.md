@@ -18,6 +18,6 @@ Does a couple of things:
 But it actually works a lot better with non-existing evil skills
 
 * "Hey Mycroft, destroy the death star"
-* "Hey Mycroft, enagage warp engines and attack"
+* "Hey Mycroft, engage warp engines and start an attack"
 * "Hey Mycroft, invade england"
 * "Hey Mycroft, Hack my neighbours wifi"
