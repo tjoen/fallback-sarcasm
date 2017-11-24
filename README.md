@@ -14,10 +14,11 @@ Does a couple of things:
 
 ## Examples 
 * "Hey Mycroft, blah blah blah"
+* "Hey Mycroft, engage warp engines"
 
 But it actually works a lot better with non-existing evil skills
 
 * "Hey Mycroft, destroy the death star"
-* "Hey Mycroft, engage warp engines and start an attack"
+* "Hey Mycroft, start global thermonuclear war"
 * "Hey Mycroft, invade england"
 * "Hey Mycroft, hack my neighbours wifi"
