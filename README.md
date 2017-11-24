@@ -12,6 +12,8 @@ Does a couple of things:
 - it does a r2d2 robot-like impression, 
 - it gives a remark from the dialog file.
 
+Edit the sarcasm dialog file to suit your own taste.
+
 ## Examples 
 * "Hey Mycroft, blah blah blah"
 * "Hey Mycroft, start warp engines"
