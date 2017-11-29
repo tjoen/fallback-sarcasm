@@ -11,6 +11,8 @@ import os
 import math
 import random
 import struct
+import sys
+from websocket import create_connection
 
 __author__ = 'tjoen'
 
@@ -19,7 +21,7 @@ LOGGER = getLogger(__name__)
 DEFAULT_TEXT = "<volume level='50'><pitch level='180'>"
 DEFAULT_LANGUAGE = 'en-GB'
 filename = '/tmp/r2d2.wav'
-
+uri = 'ws://localhost:8181/core'
 
 note_freqs = [
     #  C       C#       D      D#      E       F       F#      G       G#      A       A#      B
@@ -34,6 +36,19 @@ note_freqs = [
     4186.0, 4435.0, 4699.0, 4978.0, 5274.0, 5588.0, 5920.0, 6272.0, 6645.0, 7040.0, 7459.0, 7902.0,
 ]
 
+def send_message(type, data):
+    ws = create_connection(uri)
+    print "Sending " + type + " to " + uri + "..."
+    if data:
+        data = data
+    else:
+        data = "{}"
+    message = '{"type": "' + type + '", "data": "'+ data +'"}'
+    result = ws.send(message)
+    print "Receiving..."
+    result =  ws.recv()
+    print "Received '%s'" % result
+    ws.close()
 
 def generate_sin_wave(sample_rate, frequency, duration, amplitude):
     """
@@ -114,7 +129,6 @@ class WaveFile(object):
             for d in self.data:
                 sound_data = struct.pack('<h', d)
                 f.write(sound_data)
-                                                   
 
 class SarcasmSkill(FallbackSkill):
     def __init__(self):
@@ -133,15 +147,19 @@ class SarcasmSkill(FallbackSkill):
             subprocess.call(cmd, stdout=f, stderr=f)
             f.seek(0)
             output = f.read()
+        send_message('recognizer_loop:audio_output_start')
         self.play(fname)
         os.remove(fname)
+        send_message('recognizer_loop:audio_output_end')
 
 
     def r2d2talk(self, filename):
         filename = '/tmp/r2d2.wav'
         generate_r2d2_message(filename)
+        send_message('recognizer_loop:audio_output_start')
         self.play(filename)
-        os.remove(filename)        
+        os.remove(filename)
+        send_message('recognizer_loop:audio_output_end')
 
     def play(self,filename):
         cmd = ['aplay', str(filename)]
