@@ -147,10 +147,10 @@ class SarcasmSkill(FallbackSkill):
             subprocess.call(cmd, stdout=f, stderr=f)
             f.seek(0)
             output = f.read()
-        send_message('recognizer_loop:audio_output_start')
+        send_message('recognizer_loop:audio_output_start', '{}')
         self.play(fname)
         os.remove(fname)
-        send_message('recognizer_loop:audio_output_end')
+        send_message('recognizer_loop:audio_output_end', '{}')
 
 
     def r2d2talk(self, filename):
