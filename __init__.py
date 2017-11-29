@@ -159,7 +159,7 @@ class SarcasmSkill(FallbackSkill):
         send_message('recognizer_loop:audio_output_start', '{}')
         self.play(filename)
         os.remove(filename)
-        send_message('recognizer_loop:audio_output_end', '{})
+        send_message('recognizer_loop:audio_output_end', '{}')
 
     def play(self,filename):
         cmd = ['aplay', str(filename)]
