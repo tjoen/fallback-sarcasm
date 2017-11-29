@@ -156,10 +156,10 @@ class SarcasmSkill(FallbackSkill):
     def r2d2talk(self, filename):
         filename = '/tmp/r2d2.wav'
         generate_r2d2_message(filename)
-        send_message('recognizer_loop:audio_output_start')
+        send_message('recognizer_loop:audio_output_start', '{}')
         self.play(filename)
         os.remove(filename)
-        send_message('recognizer_loop:audio_output_end')
+        send_message('recognizer_loop:audio_output_end', '{})
 
     def play(self,filename):
         cmd = ['aplay', str(filename)]
