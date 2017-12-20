@@ -135,7 +135,7 @@ class SarcasmSkill(FallbackSkill):
         super(SarcasmSkill, self).__init__()
 
     def initialize(self):
-        self.register_fallback(self.handle_fallback, 100)
+        self.register_fallback(self.handle_fallback, 80)
 
     def say(self,text,lang):
         with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
