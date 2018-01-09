@@ -1,7 +1,7 @@
 ## sarcasm-fallbackskill
 Fallback for when Mycroft doesn't know the answer
 
-Install prereq picotts with 'sudo apt-get libttspico-utils' first!
+Install prereq picotts with 'sudo apt-get install libttspico-utils' first!
 
 ## Description 
  
