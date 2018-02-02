@@ -1,1 +1,1 @@
-sudo apt-get install libttspico-utils
+sudo apt-get install -y libttspico-utils
