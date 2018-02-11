@@ -1,10 +1,10 @@
 # Funny fallbackskill
 # Add more sarcasm to your Mycroft
-# Install prereq picotts with 'sudo apt-get libttspico-utils' first
 
 
 from mycroft.skills.core import FallbackSkill
 from mycroft.util.log import getLogger
+from mycroft.api import Api
 import tempfile
 import subprocess
 import os
@@ -170,15 +170,26 @@ class SarcasmSkill(FallbackSkill):
 
     def handle_fallback(self, message):
         txt = message.data.get("utterance")
+        SFoptions = self.settings.get('SFoptions', 'default')
         rnd = random.randint(1, 3)
         LOGGER.debug("The message data is: {}".format(message.data))
-        if rnd == 1:
-            self.say(DEFAULT_TEXT + txt,DEFAULT_LANGUAGE)
-        elif rnd == 2:
+        if SFoptions == 'default':
+            if rnd == 1 or :
+                self.say(DEFAULT_TEXT + txt,DEFAULT_LANGUAGE)
+            elif rnd == 2:
+                self.r2d2talk('/tmp/r2d2.wav')
+            else:
+                self.speak_dialog('sarcasm', {'talk': txt})
+            return True
+        elif SFoptions == 'beep':
             self.r2d2talk('/tmp/r2d2.wav')
-        else:
+            return True
+        elif SFoptions == 'dialog':
             self.speak_dialog('sarcasm', {'talk': txt})
-        return True
+            return True
+        else:
+            self.say(DEFAULT_TEXT + txt,DEFAULT_LANGUAGE)
+            return True
 
 
 def create_skill():
