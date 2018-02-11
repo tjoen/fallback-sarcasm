@@ -1,0 +1,23 @@
+{
+    "name": "Sarcasm Fallback",
+    "skillMetadata": {
+        "sections": [
+            {
+                "name": "Sarcasm Fallback settings",
+                "fields": [
+                    {
+                        "type": "label",
+                        "label": "Choose between the following options:"
+                    },
+                    {
+                        "name": "SFoptions",
+                        "type": "select",
+                        "label": "Sarcasm fallback configuration",
+                        "options": "Default (choose random option)|default;Beep-speak|beep;High-pitch echo|speak;Use dialog file|dialog",
+                        "value": "default"
+                    }
+                ]
+            }
+        ]
+    }
+}
