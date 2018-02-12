@@ -174,7 +174,7 @@ class SarcasmSkill(FallbackSkill):
         rnd = random.randint(1, 3)
         LOGGER.debug("SFoptions is: {}".format( self.settings.get('SFoptions') ))
         if SFoptions == 'default':
-            if rnd == 1 or :
+            if rnd == 1:
                 self.say(DEFAULT_TEXT + txt,DEFAULT_LANGUAGE)
             elif rnd == 2:
                 self.r2d2talk('/tmp/r2d2.wav')
