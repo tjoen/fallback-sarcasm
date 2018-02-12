@@ -172,7 +172,7 @@ class SarcasmSkill(FallbackSkill):
         txt = message.data.get("utterance")
         SFoptions = self.settings.get('SFoptions', 'default')
         rnd = random.randint(1, 3)
-        LOGGER.debug("The message data is: {}".format(message.data))
+        LOGGER.debug("SFoptions is: {}".format( self.settings.get('SFoptions') ))
         if SFoptions == 'default':
             if rnd == 1 or :
                 self.say(DEFAULT_TEXT + txt,DEFAULT_LANGUAGE)
