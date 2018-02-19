@@ -1,165 +1,129 @@
-# Funny fallbackskill
-# Add more sarcasm to your Mycroft
-
-
-from mycroft.skills.core import FallbackSkill
+from os.path import dirname
+from mycroft.skills.core import MycroftSkill
+from mycroft.skills.core import intent_handler, intent_file_handler
+from adapt.intent import IntentBuilder
+from mycroft.configuration import ConfigurationManager
+from mycroft.util import resolve_resource_file
 from mycroft.util.log import getLogger
-from mycroft.api import Api
-import tempfile
-import subprocess
-import os
-import math
-import random
-import struct
-import sys
+from subprocess import Popen, PIPE
+from ctypes import *
+from contextlib import contextmanager
+from os import environ, path
+from pocketsphinx.pocketsphinx import *
+from sphinxbase.sphinxbase import *
+from HTMLParser import HTMLParser
 from websocket import create_connection
+import tempfile
+import requests
+import json
+import random
+import time
+import pyaudio
+import sys
+
 
 __author__ = 'tjoen'
 
 LOGGER = getLogger(__name__)
 
-DEFAULT_TEXT = "<volume level='50'><pitch level='180'>"
-DEFAULT_LANGUAGE = 'en-GB'
-filename = '/tmp/r2d2.wav'
-uri = 'ws://localhost:8181/core'
+validmc = [ '1', '2', '3', '4']
+yesno = [ 'yes', 'no']
+score = 0
 
-note_freqs = [
-    #  C       C#       D      D#      E       F       F#      G       G#      A       A#      B
-     16.35,  17.32,  18.35,  19.45,   20.6,  21.83,  23.12,   24.5,  25.96,   27.5,  29.14,  30.87,
-      32.7,  34.65,  36.71,  38.89,   41.2,  43.65,  46.25,   49.0,  51.91,   55.0,  58.27,  61.74,
-     65.41,   69.3,  73.42,  77.78,  82.41,  87.31,   92.5,   98.0,  103.8,  110.0,  116.5,  123.5,
-     130.8,  138.6,  146.8,  155.6,  164.8,  174.6,  185.0,  196.0,  207.7,  220.0,  233.1,  246.9,
-     261.6,  277.2,  293.7,  311.1,  329.6,  349.2,  370.0,  392.0,  415.3,  440.0,  466.2,  493.9,
-     523.3,  554.4,  587.3,  622.3,  659.3,  698.5,  740.0,  784.0,  830.6,  880.0,  932.3,  987.8,
-    1047.0, 1109.0, 1175.0, 1245.0, 1319.0, 1397.0, 1480.0, 1568.0, 1661.0, 1760.0, 1865.0, 1976.0,
-    2093.0, 2217.0, 2349.0, 2489.0, 2637.0, 2794.0, 2960.0, 3136.0, 3322.0, 3520.0, 3729.0, 3951.0,
-    4186.0, 4435.0, 4699.0, 4978.0, 5274.0, 5588.0, 5920.0, 6272.0, 6645.0, 7040.0, 7459.0, 7902.0,
-]
+config = ConfigurationManager.get()
+ERROR_HANDLER_FUNC = CFUNCTYPE(None, c_char_p, c_int, c_char_p, c_int, c_char_p)
 
-def send_message(type, data):
-    ws = create_connection(uri)
-    print "Sending " + type + " to " + uri + "..."
-    if data:
-        data = data
-    else:
-        data = "{}"
-    message = '{"type": "' + type + '", "data": "'+ data +'"}'
-    result = ws.send(message)
-    print "Receiving..."
-    result =  ws.recv()
-    print "Received '%s'" % result
-    ws.close()
+def py_error_handler(filename, line, function, err, fmt):
+    pass
 
-def generate_sin_wave(sample_rate, frequency, duration, amplitude):
-    """
-    Generate a sinusoidal wave based on `sample_rate`, `frequency`, `duration` and `amplitude`
-    `frequency` in Hertz, `duration` in seconds, the values of `amplitude` must be in range [0..1]
-    """
-    data = []
-    samples_num = int(duration * sample_rate)
-    volume = amplitude * 32767
-    for n in range(samples_num):
-        value = math.sin(2 * math.pi * n * frequency / sample_rate)
-        data.append(int(value * volume))
-    return data
+c_error_handler = ERROR_HANDLER_FUNC(py_error_handler)
 
-def generate_r2d2_message(filename):
-    """
-    Generate R2D2 message and save to `filename`
-    """
-    min_msg_len = 1
-    max_msg_len = 20
-    r2d2_message = []
-    for _ in range(random.randint(min_msg_len, max_msg_len)):
-        r2d2_message.append(note_freqs[random.randint(0, len(note_freqs) - 1)])
+@contextmanager
+def noalsaerr():
+    asound = cdll.LoadLibrary('libasound.so')
+    asound.snd_lib_error_set_handler(c_error_handler)
+    yield
+    asound.snd_lib_error_set_handler(None)
 
-    sample_rate = 8000  # 8000 Hz
-    dot_dur = 0.080  # 80 ms
-    volume = 0.10  # 80%
-
-    wave = WaveFile(sample_rate)
-    wave_duration = 0
-    wave_data = []
-    for freq in r2d2_message:
-        wave_duration += dot_dur
-        wave_data += generate_sin_wave(sample_rate, freq, dot_dur, volume)
-    wave.add_data_subchunk(wave_duration, wave_data)
-    wave.save(filename)
-
-class WaveFile(object):
-    """
-    Wave file worker class
-    """
-
-    def __init__(self, sample_rate):
-        self.subchunk_size = 16   # subchunk data size (16 for PCM)
-        self.compression_type = 1 # compression (PCM = 1 [linear quantization])
-        self.channels_num = 1     # channels (mono = 1, stereo = 2)
-        self.bits_per_sample = 16
-        self.block_alignment = self.channels_num * self.bits_per_sample // 8
-        self.sample_rate = sample_rate
-        self.byte_rate = self.sample_rate * self.channels_num * self.bits_per_sample // 8
-        self.duration = 0
-        self.data = []
-
-    def add_data_subchunk(self, duration, data):
-        self.duration += duration
-        self.data += data
-
-    def save(self, filename):
-        self.samples_num = int(self.duration * self.sample_rate)
-        self.subchunk2_size = self.samples_num * self.channels_num * self.bits_per_sample // 8
-        with open(filename, 'wb') as f:
-            # write RIFF header
-            f.write(b'RIFF')
-            f.write(struct.pack('<I', 4 + (8 + self.subchunk_size) + (8 + self.subchunk2_size)))
-            f.write(b'WAVE')
-            # write fmt subchunk
-            f.write(b'fmt ')                                   # chunk type
-            f.write(struct.pack('<I', self.subchunk_size))     # data size
-            f.write(struct.pack('<H', self.compression_type))  # compression type
-            f.write(struct.pack('<H', self.channels_num))      # channels
-            f.write(struct.pack('<I', self.sample_rate))       # sample rate
-            f.write(struct.pack('<I', self.byte_rate))         # byte rate
-            f.write(struct.pack('<H', self.block_alignment))   # block alignment
-            f.write(struct.pack('<H', self.bits_per_sample))   # sample depth
-            # write data subchunk
-            f.write(b'data')
-            f.write(struct.pack ('<I', self.subchunk2_size))
-            for d in self.data:
-                sound_data = struct.pack('<h', d)
-                f.write(sound_data)
-
-class SarcasmSkill(FallbackSkill):
+class LsttSkill(MycroftSkill):
     def __init__(self):
-        super(SarcasmSkill, self).__init__()
+        super(LsttSkill, self).__init__(name="LsttSkill")
+        LOGGER.info("Starting Lstt")
 
     def initialize(self):
-        self.register_fallback(self.handle_fallback, 80)
+	lstt_intent = IntentBuilder("LsttIntent").\
+            require("LsttKeyword").build()
+        self.register_intent(lstt_intent, self.handle_lstt_intent)
+	
+    def invalid(self):
+        self.say("I did not understand you.")
+	p = self.runpocketsphinx("Please choose 1, 2, 3 or 4.", False, validmc)
+        self.settings['myanswer'] = p
+        return p
+	
+    def repeat(self):
+        self.say('I will repeat the question')
+        p = self.repeatquestion( self.settings.get('cat'), self.settings.get('question'), self.settings.get('answers'), self.settings.get('correct_answer'))
+        self.settings['myanswer'] = p
+        return p
 
-    def say(self,text,lang):
-        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
-            fname = f.name
-        cmd = ['pico2wave', '--wave', fname]
-        cmd.extend(['-l', lang])
+    def askstop(self):
+	response = self.runpocketsphinx("Would you like to stop?", False, yesno)
+	if response == 'yes':
+	    self.endgame()
+	else:
+	    p= self.runpocketsphinx("Choose 1,2,3 or 4", False, validmc)
+            self.settings['myanswer'] = p
+            return p
+	
+    def help(self):
+	p = self.runpocketsphinx("I can not help you. What is your answer?", False, validmc)
+        return p
+
+    def start(self):
+	response = self.runpocketsphinx("Would you like to restart?", False, yesno)
+	if response == 'yes':
+	    self.handle_trivia_intent()
+	else:
+	    p = self.runpocketsphinx("Choose 1,2,3 or 4", False, validmc)
+            self.settings['myanswer'] = p
+            return p
+	
+    def mychoice(self, x):
+        try:
+            return {
+        'ONE': '1',
+        'TWO': '2',
+        'THREE': '3',
+        'FOUR': '4',
+        'FIVE': '5',
+        'SIX': '6',
+        'SEVEN': '7',
+        'EIGHT': '8',
+        'NINE': '9',
+        'TEN': '10',
+        'REPEAT': 'repeat',
+        'STOP': 'stop',
+        'PAUZE': 'pauze',
+        'END': 'stop',
+        'START': 'start',
+        'QUIT': 'stop',
+        'NEVER': 'invalid',
+        'MIND': 'invalid',
+        'HELP': 'help',
+        'PLAY': 'start',
+        'YES': 'yes',
+        'NO': 'no',
+            }[x]
+        except KeyError:
+            return 'invalid'
+
+    def say(self, text):
+        self.wsnotify('recognizer_loop:audio_output_start')
+        cmd = ['mimic','--setf','int_f0_target_mean=85','--setf' 'duration_stretch=1.2','-t']
         cmd.append(text)
-        with tempfile.TemporaryFile() as f:
-            subprocess.call(cmd, stdout=f, stderr=f)
-            f.seek(0)
-            output = f.read()
-        send_message('recognizer_loop:audio_output_start', '{}')
-        self.play(fname)
-        os.remove(fname)
-        send_message('recognizer_loop:audio_output_end', '{}')
-
-
-    def r2d2talk(self, filename):
-        filename = '/tmp/r2d2.wav'
-        generate_r2d2_message(filename)
-        send_message('recognizer_loop:audio_output_start', '{}')
-        self.play(filename)
-        os.remove(filename)
-        send_message('recognizer_loop:audio_output_end', '{}')
+        subprocess.call(cmd)
+        self.wsnotify('recognizer_loop:audio_output_end')
 
     def play(self,filename):
         cmd = ['aplay', str(filename)]
@@ -168,29 +132,211 @@ class SarcasmSkill(FallbackSkill):
             f.seek(0)
             output = f.read()
 
-    def handle_fallback(self, message):
-        txt = message.data.get("utterance")
-        SFoptions = self.settings.get('SFoptions', 'default')
-        rnd = random.randint(1, 3)
-        LOGGER.debug("SFoptions is: {}".format( self.settings.get('SFoptions') ))
-        if SFoptions == 'default':
-            if rnd == 1:
-                self.say(DEFAULT_TEXT + txt,DEFAULT_LANGUAGE)
-            elif rnd == 2:
-                self.r2d2talk('/tmp/r2d2.wav')
+    def wsnotify(self, msg):
+        uri = 'ws://localhost:8181/core'
+        ws = create_connection(uri)
+        print "Sending " + msg + " to " + uri + "..."
+        data = "{}"
+        message = '{"type": "' + msg + '", "data": ' + data +'}'
+        result = ws.send(message)
+        print "Receiving..."
+        result =  ws.recv()
+        print "Received '%s'" % result
+        ws.close()
+
+    def handle_record_begin(self):
+        LOGGER.info("Lsst - Begin Recording...") 
+        # If enabled, play a wave file with a short sound to audibly
+        # indicate recording has begun.
+        if config.get('confirm_listening'):
+            file = resolve_resource_file(
+                config.get('sounds').get('start_listening'))
+            if file:
+                play(file)
+        self.wsnotify('recognizer_loop:record_begin')
+
+    def handle_record_end(self):
+        LOGGER.info("Lsst - End Recording...")
+        self.wsnotify('recognizer_loop:record_end')
+
+    def runpocketsphinx(self, msg, speakchoice, arr):
+        self.say(msg)
+        HOMEDIR = '/home/pi/'
+        config = Decoder.default_config()
+        config.set_string('-hmm', '/usr/local/lib/python2.7/site-packages/mycroft_core-0.9.17-py2.7.egg/mycroft/client/speech/recognizer/model/en-us/hmm')
+        config.set_string('-lm', path.join(HOMEDIR, 'localstt.lm'))
+        config.set_string('-dict', path.join(HOMEDIR, 'localstt.dic'))
+        config.set_string('-logfn', '/dev/null')
+        decoder = Decoder(config)
+
+        with noalsaerr():
+            p = pyaudio.PyAudio()
+        stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=1024)
+        stream.start_stream()
+        self.handle_record_begin()
+      
+        in_speech_bf = False
+        decoder.start_utt()
+        while True:
+            buf = stream.read(1024)
+            if buf:
+                decoder.process_raw(buf, False, False)
+                if decoder.get_in_speech() != in_speech_bf:
+                    in_speech_bf = decoder.get_in_speech()
+                    if not in_speech_bf:
+                        decoder.end_utt()
+                        #print 'Result:', decoder.hyp().hypstr
+                        utt = decoder.hyp().hypstr
+                        decoder.start_utt()
+                        if utt.strip() != '':
+                            self.handle_record_end()
+                            stream.stop_stream()
+                            stream.close()
+                            p.terminate()
+                            reply = utt.strip().split(None, 1)[0]
+			    if speakchoice:
+                                self.say( "Your answer is " + reply )
+	                    selection = self.mychoice(reply)
+                            if selection in arr:
+                                # Do the thing
+                                self.settings['myanswer'] = selection
+                                return selection
+                            elif selection == 'repeat':
+                                self.repeat()
+                            elif selection == 'stop':
+                                self.askstop()
+                            elif selection == 'help':
+                                self.help()
+                            elif selection == 'start':
+                                self.start()
+                            else:
+                                self.invalid()                            
+                            break
             else:
-                self.speak_dialog('sarcasm', {'talk': txt})
-            return True
-        elif SFoptions == 'beep':
-            self.r2d2talk('/tmp/r2d2.wav')
-            return True
-        elif SFoptions == 'dialog':
-            self.speak_dialog('sarcasm', {'talk': txt})
-            return True
+                break
+        decoder.end_utt()
+    
+    def score(self, point):
+        global score
+        score = score+point
+        self.enclosure.mouth_text( "SCORE: "+str(score) )
+        return
+
+    def wrong(self, right_answer):
+        self.enclosure.mouth_text( "WRONG!" )
+        self.say("Sorry, that is the wrong answer.")
+        self.play( self.settings.get('resdir')+'false.wav' )
+        self.say("The answer is "+right_answer)
+        return
+
+    def right(self):
+        self.enclosure.mouth_text( "CORRECT!" )
+        self.say("That is the right answer")
+        self.play( self.settings.get('resdir')+'true.wav' )
+        self.score(1)
+        return    
+
+    def preparequestion(self, category, question, answers, right_answer):
+        self.enclosure.activate_mouth_events()
+        self.enclosure.mouth_reset()
+        h = HTMLParser()
+        quest = h.unescape( question )
+        time.sleep(1.5)
+        self.say("The category is "+ category+ ". " + quest )
+        correct_answer = h.unescape( right_answer )
+        allanswers = list()
+        allanswers.append(h.unescape(right_answer))
+        for a in answers:
+            allanswers.append(h.unescape(a))
+        random.shuffle(allanswers)
+        self.settings['cat'] = category
+        self.settings['question'] = quest
+        self.settings['answers'] = allanswers
+        self.settings['correct_answer'] = correct_answer
+        self.askquestion( category, quest, allanswers, correct_answer )
+    
+    def repeatquestion(self, category, question, answers, right_answer):
+        time.sleep(1)
+        self.say("The category is "+category+". "+ question )
+        i=0
+        ans = ""
+        for a in answers:
+            i = i + 1
+            self.say(str(i) + ".    " + a)
+        response = self.runpocketsphinx("Choose 1,2,3 or 4.", False, validmc)
+        # response = self.settings.get('myanswer')
+        # self.say("Your choice is "+ str(response))
+        return response
+
+    def askquestion( self, category, quest, allanswers, correct_answer):
+        i=0
+        ans = ""
+        for a in allanswers:
+            i = i + 1
+            self.say(str(i) + ".    " + a)
+        response = self.runpocketsphinx("Choose 1,2,3 or 4.", False, validmc)
+        response2 = self.settings.get('myanswer')
+        self.say("Your choice is "+ str(response2))
+        self.enclosure.deactivate_mouth_events()
+        if correct_answer == allanswers[int(response)-1]:
+            self.right()
         else:
-            self.say(DEFAULT_TEXT + txt,DEFAULT_LANGUAGE)
-            return True
+            self.wrong(correct_answer)
+        return 
+
+    def endgame(self):
+        self.enclosure.deactivate_mouth_events()
+        self.play( self.settings.get('resdir')+'end.wav' )
+        self.enclosure.mouth_text( "SCORE: "+str(score) )
+        self.say("You answered " +str(score)+ " questions correct")
+        self.say("Thanks for playing!")
+        self.stop()
+    
+    def handle_trivia_intent(self):
+        self.enclosure.deactivate_mouth_events()
+        # Display icon on faceplate
+        self.enclosure.mouth_display("aIMAMAMPMPMPMAMAAPAPADAAIOIOAAAHAMAMAHAAIOIOAAAPAFAFAPAAMLMLAAAAAA", x=1, y=0, refresh=True)
+        time.sleep(2) 
+        self.settings['cat'] = None
+        self.settings['question'] = None
+        self.settings['answers'] = None
+        self.settings['myanswer'] = None
+        self.settings['correct_answer'] = None
+        self.settings['resdir'] = '/opt/mycroft/skills/lstt-skill/res/'
+        url = "https://opentdb.com/api.php?amount=5&type=multiple"
+        headers = {'Accept': 'text/plain'}
+        r = requests.get(url, headers)
+        m = json.loads(r.text)
+        questions = m['results'];
+        global score
+        score = 0
+        self.play( self.settings.get('resdir')+'intro.wav' )
+        self.say("Okay, lets play a game of trivia. Get ready!")
+        for f in questions:
+            self.enclosure.activate_mouth_events()
+            self.enclosure.mouth_reset()
+            self.preparequestion( f['category'], f['question'], f['incorrect_answers'], f['correct_answer'])
+        self.endgame()
+    
+    def stop(self):
+        self.enclosure.activate_mouth_events()
+        self.enclosure.mouth_reset()
+        self.enclosure.reset()    
+        command = 'service mycroft-speech-client start'.split()
+        command2 = 'service mycroft-speech-client start'.split()
+        p = Popen(['sudo', '-S'] + command, stdin=PIPE, stderr=PIPE, universal_newlines=True)
+        p = Popen(['sudo', '-S'] + command2, stdin=PIPE, stderr=PIPE, universal_newlines=True)
+        LOGGER.info("Starting speech-client" )
+        pass
+
+    def handle_lstt_intent(self, message):
+        command = 'service mycroft-speech-client stop'.split()
+        command2 = 'service mycroft-audio stop'.split()
+        p = Popen(['sudo', '-S'] + command, stdin=PIPE, stderr=PIPE, universal_newlines=True)
+        p = Popen(['sudo', '-S'] + command2, stdin=PIPE, stderr=PIPE, universal_newlines=True)
+        LOGGER.info("Stopping speech-client")
+	self.handle_trivia_intent()
 
 
 def create_skill():
-    return SarcasmSkill()
+      return LsttSkill()
