@@ -5,7 +5,7 @@ from adapt.intent import IntentBuilder
 from mycroft.configuration import ConfigurationManager
 from mycroft.util import resolve_resource_file
 from mycroft.util.log import getLogger
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, call
 from ctypes import *
 from contextlib import contextmanager
 from os import environ, path
